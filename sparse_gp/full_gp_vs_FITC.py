@@ -103,7 +103,7 @@ if __name__ == "__main__":
     """
 
     # points
-    X = np.arange(-4, 5, 0.2).reshape(-1,1)
+    X = np.arange(-5, 6, 0.2).reshape(-1,1)
 
     # mean and covariance of the PRIOR
     mu  = np.zeros(X.shape)
@@ -117,15 +117,15 @@ if __name__ == "__main__":
     """
     Prediction from noisy training data
     """
-    noise = 0.4
+    noise = 0.8
     # noise = 1e-8
     noise_assumption = 1
 
     # Noisy training data
-    X_train = np.arange(-3, 4, 0.01).reshape(-1, 1)
+    X_train = np.arange(-3, 4, 0.07).reshape(-1, 1)
     Y_train = np.sin(X_train) + noise * np.random.randn(*X_train.shape)
     # portion of data
-    p = 40
+    p = 10
     X_ind   = X_train[::p]
     Y_ind   = Y_train[::p]
 
