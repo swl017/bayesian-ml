@@ -1,7 +1,8 @@
 # http://krasserm.github.io/2018/03/19/gaussian-processes/
 
 import numpy as np
-from gaussian_processes_util import plot_gp, plot_gp_compare
+from gaussian_processes_util import plot_gp, plot_gp_compare, plot_gp_compare6
+import gaussian_processes_util
 import matplotlib.pyplot as plt
 
 # def mse(X_test, Y_test, X_train, Y_train):
@@ -98,6 +99,9 @@ def posterior_predictive_FITC(X_s, X_train, X_ind, Y_train, l=1.0, sigma_f=1.0, 
 
 
 if __name__ == "__main__":
+    plot_num3 = False
+    l = 1
+    sigma_f = 1
     """
     Prior
     """
@@ -123,7 +127,9 @@ if __name__ == "__main__":
 
     # Noisy training data
     X_train = np.arange(-3, 4, 0.07).reshape(-1, 1)
-    Y_train = np.sin(X_train) + noise * np.random.randn(*X_train.shape)
+    Y_train = np.sin(X_train * (np.pi/2)) + noise * np.random.randn(*X_train.shape)
+    gaussian_processes_util.Y_true = np.sin(X * (np.pi/2))
+
     # portion of data
     p = 10
     X_ind   = X_train[::p]
@@ -133,11 +139,17 @@ if __name__ == "__main__":
     # Compute mean and covariance of the posterior predictive distribution
     mu_s, cov_s = posterior_predictive(X, X_train, Y_train, sigma_y=noise_assumption)
     samples = np.random.multivariate_normal(mu_s.ravel(), cov_s, 3)
-    plot_gp_compare(mu_s, cov_s, X, X_train=X_train, Y_train=Y_train, samples=samples, i=1, title="Full GP with total "+str(len(X_train))+" data points")
+    if(plot_num3):
+        plot_gp_compare(mu_s, cov_s, X, X_train=X_train, Y_train=Y_train, samples=samples, i=1, title=f"Full GP with total {len(X_train)} data points, l={l}, f={sigma_f}")
+    else:
+        plot_gp_compare6(mu_s, cov_s, X, X_train=X_train, Y_train=Y_train, samples=samples, i=1, title=f"Full GP with total {len(X_train)} data points, l={l}, f={sigma_f}")
 
     mu_s, cov_s = posterior_predictive(X, X_ind, Y_ind, sigma_y=noise_assumption)
     samples = np.random.multivariate_normal(mu_s.ravel(), cov_s, 3)
-    plot_gp_compare(mu_s, cov_s, X, X_train=X_ind, Y_train=Y_ind, samples=samples, i=2, title="Full GP with 1/"+str(p)+" data points")
+    if(plot_num3):
+        plot_gp_compare(mu_s, cov_s, X, X_train=X_ind, Y_train=Y_ind, samples=samples, i=2, title=f"Full GP with 1/{p} data points")
+    else:
+        plot_gp_compare6(mu_s, cov_s, X, X_train=X_ind, Y_train=Y_ind, samples=samples, i=3, title=f"Full GP with 1/{p} data points")
 
     """FITC"""
     # Compute mean and covariance of the posterior predictive distribution
@@ -145,6 +157,105 @@ if __name__ == "__main__":
 
     samples = np.random.multivariate_normal(mu_z.ravel(), cov_z, 3)
     title = "FITC with 1/"+str(p)+" data points"
-    plot_gp_compare(mu_z, cov_z, X, X_train=X_ind, Y_train=Y_ind, samples=samples, i=3, title=title)
+    if(plot_num3):
+        plot_gp_compare(mu_z, cov_z, X, X_train=X_ind, Y_train=Y_ind, samples=samples, i=3, title=title)
+        plt.show()
+    else:
+        plot_gp_compare6(mu_z, cov_z, X, X_train=X_ind, Y_train=Y_ind, samples=samples, i=5, title=title)
+    # plot_gp(mu_z, cov_z, X, X_train=X_ind, Y_train=Y_ind, samples=samples)
+
+    """
+    Parameter Optimization
+    """
+    from numpy.linalg import cholesky, det, lstsq
+    from scipy.optimize import minimize
+
+    def nll_fn(X_train, Y_train, noise, naive=True):
+        """
+        Returns a function that computes the negative log marginal
+        likelihood for training data X_train and Y_train and given
+        noise level.
+
+        Args:
+            X_train: training locations (m x d).
+            Y_train: training targets (m x 1).
+            noise: known noise level of Y_train.
+            naive: if True use a naive implementation of Eq. (11), if
+                False use a numerically more stable implementation.
+
+        Returns:
+            Minimization objective.
+        """
+        
+        Y_train = Y_train.ravel()
+        
+        def nll_naive(theta):
+            # Naive implementation of Eq. (11). Works well for the examples 
+            # in this article but is numerically less stable compared to 
+            # the implementation in nll_stable below.
+            K = kernel(X_train, X_train, l=theta[0], sigma_f=theta[1]) + \
+                noise**2 * np.eye(len(X_train))
+            return 0.5 * np.log(det(K)) + \
+                0.5 * Y_train.dot(inv(K).dot(Y_train)) + \
+                0.5 * len(X_train) * np.log(2*np.pi)
+            
+        def nll_stable(theta):
+            # Numerically more stable implementation of Eq. (11) as described
+            # in http://www.gaussianprocess.org/gpml/chapters/RW2.pdf, Section
+            # 2.2, Algorithm 2.1.
+            
+            def ls(a, b):
+                return lstsq(a, b, rcond=-1)[0]
+            
+            K = kernel(X_train, X_train, l=theta[0], sigma_f=theta[1]) + \
+                noise**2 * np.eye(len(X_train))
+            L = cholesky(K)
+            return np.sum(np.log(np.diagonal(L))) + \
+                0.5 * Y_train.dot(ls(L.T, ls(L, Y_train))) + \
+                0.5 * len(X_train) * np.log(2*np.pi)
+
+        if naive:
+            return nll_naive
+        else:
+            return nll_stable
+
+    # Minimize the negative log-likelihood w.r.t. parameters l and sigma_f.
+    # We should actually run the minimization several times with different
+    # initializations to avoid local minima but this is skipped here for
+    # simplicity.
+    l = 1
+    sigma_f = 1
+    l_tmp = l
+    f_tmp = sigma_f
+    for i in range(20):
+        res = minimize(nll_fn(X_train, Y_train, noise), [l_tmp, f_tmp], 
+                    bounds=((1e-5, None), (1e-5, None)),
+                    method='L-BFGS-B')
+        l_tmp, f_tmp = res.x
+
+    # Store the optimization results in global variables so that we can
+    # compare it later with the results from other implementations.
+    l_opt, sigma_f_opt = res.x
+    print("Kernel parameters: l= %.2f, l_opt = %.2f, f = %.2f, f_opt = %.2f"\
+        %(l, l_opt, sigma_f, sigma_f_opt))
+
+    # Compute posterior mean and covariance with optimized kernel parameters and plot the results
+    """Full GP"""
+    # Compute mean and covariance of the posterior predictive distribution
+    mu_s, cov_s = posterior_predictive(X, X_train, Y_train,l=l_opt, sigma_f=sigma_f_opt, sigma_y=noise_assumption)
+    samples = np.random.multivariate_normal(mu_s.ravel(), cov_s, 3)
+    plot_gp_compare6(mu_s, cov_s, X, X_train=X_train, Y_train=Y_train, samples=samples, i=2, title=f"Optimized Full GP with total {len(X_train)} data points, l={l_opt}, f={sigma_f_opt}")
+
+    mu_s, cov_s = posterior_predictive(X, X_ind, Y_ind, l=l_opt, sigma_f=sigma_f_opt, sigma_y=noise_assumption)
+    samples = np.random.multivariate_normal(mu_s.ravel(), cov_s, 3)
+    plot_gp_compare6(mu_s, cov_s, X, X_train=X_ind, Y_train=Y_ind, samples=samples, i=4, title=f"Optimized Full GP with 1/{p} data points, l={l_opt}, f={sigma_f_opt}")
+
+    """FITC"""
+    # Compute mean and covariance of the posterior predictive distribution
+    mu_z, cov_z = posterior_predictive_FITC(X, X_train, X_ind, Y_train, l=l_opt, sigma_f=sigma_f_opt, sigma_y=noise_assumption)
+
+    samples = np.random.multivariate_normal(mu_z.ravel(), cov_z, 3)
+    title = "Optimized FITC with 1/"+str(p)+" data points"
+    plot_gp_compare6(mu_z, cov_z, X, X_train=X_ind, Y_train=Y_ind, samples=samples, i=6, title=title)
     # plot_gp(mu_z, cov_z, X, X_train=X_ind, Y_train=Y_ind, samples=samples)
     plt.show()

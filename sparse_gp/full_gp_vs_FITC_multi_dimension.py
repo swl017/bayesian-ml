@@ -2,6 +2,7 @@
 
 import numpy as np
 from gaussian_processes_util import plot_gp, plot_gp_compare, plot_gp_2D
+import gaussian_processes_util
 import matplotlib.pyplot as plt
 
 # def mse(X_test, Y_test, X_train, Y_train):
@@ -209,13 +210,13 @@ if __name__ == "__main__":
     # X_train = np.arange(-3, 4, 0.07).reshape(-1, 1)
     # Y_train = np.sin(X_train) + noise * np.random.randn(*X_train.shape)
     X_2D_train = np.random.uniform(-4, 4, (100, 2))
-    Y_2D_train = np.sin(0.5 * np.linalg.norm(X_2D_train, axis=1)) + \
+    Y_2D_train = np.sin((np.pi/2) * np.linalg.norm(X_2D_train, axis=1)) + \
                 noise_2D * np.random.randn(len(X_2D_train))
     X_train = X_2D_train
     Y_train = Y_2D_train
 
     # portion of data
-    p = 1
+    p = 3
     X_ind   = X_train[::p]
     Y_ind   = Y_train[::p]
 
@@ -231,13 +232,12 @@ if __name__ == "__main__":
     """Full GP"""
     # Compute mean and covariance of the posterior predictive distribution
     mu_s, cov_s = posterior_predictive(X, X_train, Y_train, l=l, sigma_f=sigma_f, sigma_y=noise_assumption)
-    samples = np.random.multivariate_normal(mu_s.ravel(), cov_s, 3)
+    # samples = np.random.multivariate_normal(mu_s.ravel(), cov_s, 3)
     # plot_gp_compare(mu_s, cov_s, X, X_train=X_train, Y_train=Y_train, samples=samples, i=1, title="Full GP with total "+str(len(X_train))+" data points")
     plot_gp_2D(gx, gy, mu_s, X_train, Y_train, "Full GP with total "+str(len(X_train))+" data points", 1)
 
     mu_s, cov_s = posterior_predictive(X, X_ind, Y_ind, l=l_opt, sigma_f=sigma_f_opt, sigma_y=noise_assumption)
-    # mu_s, cov_s = posterior_predictive(X, X_train, X_train, l=l_opt, sigma_f=sigma_f_opt, sigma_y=noise_assumption)
-    samples = np.random.multivariate_normal(mu_s.ravel(), cov_s, 3)
+    # samples = np.random.multivariate_normal(mu_s.ravel(), cov_s, 3)
     # plot_gp_compare(mu_s, cov_s, X, X_train=X_ind, Y_train=Y_ind, samples=samples, i=2, title="Full GP with 1/"+str(p)+" data points")
     plot_gp_2D(gx, gy, mu_s, X_ind, Y_ind, "Full GP with 1/"+str(p)+" data points", 2)
 
@@ -249,5 +249,5 @@ if __name__ == "__main__":
     title = "FITC with 1/"+str(p)+" data points"
     # plot_gp(mu_z, cov_z, X, X_train=X_ind, Y_train=Y_ind, samples=samples)
     # plot_gp_compare(mu_z, cov_z, X, X_train=X_ind, Y_train=Y_ind, samples=samples, i=3, title=title)
-    plot_gp_2D(gx, gy, mu_s, X_ind, Y_ind, title, 3)
+    plot_gp_2D(gx, gy, mu_z, X_ind, Y_ind, title, 3)
     plt.show()
