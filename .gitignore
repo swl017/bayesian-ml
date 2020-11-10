@@ -1,3 +1,4 @@
-.vscode/
+**/.vscode/
 bayesian-machine-learning/
 pytorch_notebooks/
+**/__pycache/
