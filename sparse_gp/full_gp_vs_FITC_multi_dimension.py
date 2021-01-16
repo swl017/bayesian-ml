@@ -184,7 +184,7 @@ if __name__ == "__main__":
 
     # points
     # X = np.arange(-5, 6, 0.2).reshape(-1,1)
-    rx, ry = np.arange(-5, 5, 0.3), np.arange(-5, 5, 0.3)
+    rx, ry = np.arange(-15, 15, 0.9), np.arange(-15, 15, 0.9)
     gx, gy = np.meshgrid(rx, rx)
 
     X_2D = np.c_[gx.ravel(), gy.ravel()]
